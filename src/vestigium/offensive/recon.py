@@ -191,17 +191,21 @@ class ReconAgent:
         if tgt.explicit_ports:
             http_ports.update(tgt.explicit_ports)
 
+        # Versoes detectadas (produto, versao, origem) para correlacao de CVE
+        versions: list[tuple[str, str, str]] = []
+
         # Servico/banner por porta aberta
         for port in open_ports:
             svc, banner = self._grab_banner(tgt.host, port, probe_http=port in http_ports)
             findings += self._service_findings(tgt.host, port, svc, banner, trace)
+            versions += self._versions_from_banner(port, banner)
             if "HTTP/" in banner:  # descobre HTTP em porta nao convencional
                 http_ports.add(port)
 
         # HTTP + TLS + descoberta nas portas web
         for port in open_ports:
             if port in http_ports:
-                findings += self._http_checks(tgt, port, trace)
+                findings += self._http_checks(tgt, port, trace, versions)
                 findings += self._discovery(tgt, port, trace)
             if port in TLS_PORTS:
                 findings += self._tls_checks(tgt.host, port, trace)
@@ -212,6 +216,10 @@ class ReconAgent:
             findings += self._dns_checks(tgt, trace)
         self._log(trace, "Sondagem SNMP (community padrao 'public')")
         findings += self._snmp_check(tgt.host, trace)
+
+        # Correlacao de versoes com CVEs conhecidas (somente deteccao)
+        self._log(trace, f"Correlacao de CVE: {len(versions)} versao(oes) detectada(s)")
+        findings += self._cve_correlation(versions, trace)
 
         findings.sort(key=lambda f: (-int(f.severity), f.category))
         finished = time.time()
@@ -319,7 +327,7 @@ class ReconAgent:
         req = urllib.request.Request(url, method=method, headers={"User-Agent": UA})
         return urllib.request.urlopen(req, timeout=self.timeout, context=ctx)
 
-    def _http_checks(self, tgt, port, trace) -> list[Finding]:
+    def _http_checks(self, tgt, port, trace, versions=None) -> list[Finding]:
         url = self._http_url(tgt, port)
         out = []
         try:
@@ -342,6 +350,10 @@ class ReconAgent:
                 resp.close()
             except Exception:
                 pass
+
+        # Versoes de software para correlacao de CVE
+        if versions is not None:
+            versions += self._versions_from_http(url, headers, body)
 
         # Cabecalhos de seguranca ausentes
         missing = []
@@ -541,6 +553,103 @@ class ReconAgent:
             mitre=["T1046"],
             recommendation="Desabilitar SNMP externo; usar SNMPv3 com credenciais fortes.",
         )]
+
+    # ---------------------------------------------------------------
+    @staticmethod
+    def _versions_from_banner(port, banner):
+        import re
+        out = []
+        if not banner:
+            return out
+        m = re.search(r"OpenSSH[_/]([\d.]+p?\d*)", banner, re.I)
+        if m:
+            out.append(("openssh", m.group(1), f"banner porta {port}"))
+        for prod, rx in (("apache", r"Apache/([\d.]+)"),
+                         ("nginx", r"nginx/([\d.]+)"),
+                         ("openssl", r"OpenSSL/([\d.]+[a-z]?)")):
+            m = re.search(rx, banner, re.I)
+            if m:
+                out.append((prod, m.group(1), f"banner porta {port}"))
+        return out
+
+    @staticmethod
+    def _versions_from_http(url, headers, body):
+        import re
+        out = []
+        srv = headers.get("server", "")
+        for prod, rx in (("apache", r"Apache/([\d.]+)"),
+                         ("nginx", r"nginx/([\d.]+)"),
+                         ("openssl", r"OpenSSL/([\d.]+[a-z]?)")):
+            m = re.search(rx, srv, re.I)
+            if m:
+                out.append((prod, m.group(1), f"Server: {srv[:60]}"))
+        xpb = headers.get("x-powered-by", "")
+        m = re.search(r"PHP/([\d.]+)", xpb, re.I)
+        if m:
+            out.append(("php", m.group(1), f"X-Powered-By: {xpb[:60]}"))
+        # WordPress (meta generator)
+        m = re.search(r'generator["\'][^>]+content=["\']WordPress\s+([\d.]+)', body, re.I) \
+            or re.search(r"WordPress\s+([\d.]+)", body)
+        if m:
+            out.append(("wordpress", m.group(1), "meta generator (HTML)"))
+        # jQuery (nome do arquivo/script)
+        m = re.search(r"jquery[-/](\d+\.\d+\.\d+)", body, re.I)
+        if m:
+            out.append(("jquery", m.group(1), "script src (HTML)"))
+        return out
+
+    def _cve_correlation(self, versions, trace):
+        from .cvedb import match_cves, cvss_severity
+        if not versions:
+            return []
+        # deduplica produto+versao
+        uniq = {}
+        for prod, ver, src in versions:
+            uniq.setdefault((prod, ver), src)
+
+        out = []
+        if uniq:
+            listed = ", ".join(f"{p} {v}" for (p, v) in uniq)
+            out.append(Finding(
+                analyzer="recon", category="cve",
+                title=f"{len(uniq)} versao(oes) de software identificada(s)",
+                severity=Severity.INFO, source="(fingerprint)",
+                description="Versoes inferidas de banners e respostas HTTP.",
+                evidence=listed[:400], tags=["fingerprint"],
+            ))
+
+        seen = set()
+        for (prod, ver), src in uniq.items():
+            for cve in match_cves(prod, ver):
+                if cve["cve"] in seen:
+                    continue
+                seen.add(cve["cve"])
+                sev = Severity[cvss_severity(cve["cvss"])]
+                self._log(trace, f"  CVE: {prod} {ver} -> {cve['cve']} (CVSS {cve['cvss']})")
+                out.append(Finding(
+                    analyzer="recon", category="cve",
+                    title=f"{prod} {ver}: {cve['cve']} (CVSS {cve['cvss']})",
+                    severity=sev, source=src,
+                    description=cve["desc"],
+                    evidence=f"{prod} {ver} — origem: {src}",
+                    tags=["cve", "vuln-detection"], mitre=["T1595.002"],
+                    recommendation=(f"Atualizar {prod}. Confirmar em "
+                                    f"https://nvd.nist.gov/vuln/detail/{cve['cve']}"),
+                    data={"cve": cve["cve"], "cvss": cve["cvss"],
+                          "product": prod, "version": ver,
+                          "nvd": f"https://nvd.nist.gov/vuln/detail/{cve['cve']}"},
+                ))
+        if seen:
+            out.append(Finding(
+                analyzer="recon", category="cve",
+                title="Correlacao de CVE e apenas indicativa (base curada, offline)",
+                severity=Severity.INFO, source="(aviso)",
+                description="A correlacao usa uma lista curada e nao exaustiva de "
+                            "CVEs e nao valida a exploracao. Confirme cada item no NVD "
+                            "e verifique patches/backports do fornecedor.",
+                tags=["disclaimer"],
+            ))
+        return out
 
     def _discovery(self, tgt, port, trace) -> list[Finding]:
         base = self._http_url(tgt, port).rstrip("/")

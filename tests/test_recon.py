@@ -32,9 +32,10 @@ def web_server(tmp_path):
     root = tmp_path / "webroot"
     root.mkdir()
     (root / "index.html").write_text(
-        '<html><head><meta name="generator" content="WordPress 6.4">'
-        '</head><body><link href="/wp-content/theme/x.css"><h1>alvo</h1>'
-        '</body></html>')
+        '<html><head><meta name="generator" content="WordPress 5.8.0">'
+        '</head><body><link href="/wp-content/theme/x.css">'
+        '<script src="/js/jquery-3.3.1.min.js"></script>'
+        '<h1>alvo</h1></body></html>')
     (root / "robots.txt").write_text("User-agent: *\nDisallow: /x")
     (root / ".env").write_text("DB_PASSWORD=segredo\nAPI_KEY=abc")
     gitdir = root / ".git"
@@ -79,6 +80,22 @@ def test_recon_detects_exposures(tmp_path, web_server):
     # deteccao de tecnologias/CMS a partir do HTML
     assert any(f.category == "tecnologias" for f in result.findings)
     assert "wordpress" in titles
+    # correlacao de CVE (WordPress 5.8.0 e jQuery 3.3.1 sao vulneraveis)
+    cve_titles = [f.title for f in result.findings if f.category == "cve"]
+    assert any("CVE-" in t for t in cve_titles), cve_titles
+
+
+def test_cvedb_matching():
+    from vestigium.offensive.cvedb import match_cves, parse_version, cvss_severity
+    assert parse_version("2.4.49") == (2, 4, 49)
+    assert parse_version("8.2p1") == (8, 2, 1)
+    ap = [c["cve"] for c in match_cves("apache", "2.4.49")]
+    assert "CVE-2021-41773" in ap and "CVE-2021-42013" in ap
+    assert match_cves("nginx", "1.25.0") == []          # versao atual: sem CVE listado
+    jq = [c["cve"] for c in match_cves("jquery", "3.3.1")]
+    assert "CVE-2019-11358" in jq
+    assert match_cves("produto-inexistente", "1.0") == []
+    assert cvss_severity(9.8) == "CRITICAL" and cvss_severity(5.0) == "MEDIUM"
 
 
 def test_probes_degrade_gracefully():

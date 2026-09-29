@@ -138,6 +138,13 @@ O que o `recon` faz:
 | **DNS** | Enumeração de registros (A/MX/NS/TXT) e higiene de e-mail — alerta para MX sem SPF/DMARC. |
 | **SNMP** | Verifica exposição de SNMP com a *community* padrão `public` (somente leitura, sem força bruta). |
 | **Descoberta** | GET não destrutivo de caminhos sensíveis (`.git`, `.env`, `server-status`, backups, painéis…). |
+| **CVE** | Extrai versões (Apache, nginx, OpenSSH, PHP, OpenSSL, WordPress, jQuery…) e correlaciona com uma **base curada e offline de CVEs conhecidas** — só detecção, com link para o NVD. |
+
+> **Sobre a correlação de CVE:** é feita contra uma lista **curada, ilustrativa e
+> offline** de CVEs de alto perfil (sem dependências nem chamadas a terceiros).
+> Ela **não é exaustiva** e **não valida exploração** — apenas relaciona a versão
+> observada a vulnerabilidades públicas. Confirme sempre cada achado no
+> [NVD](https://nvd.nist.gov/) e verifique patches/backports do fornecedor.
 
 **Salvaguardas de segurança embutidas** — este modo **não** é uma ferramenta de ataque:
 
