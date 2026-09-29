@@ -1,0 +1,5 @@
+# O nucleo do Vestigium usa apenas a biblioteca padrao do Python (>= 3.9).
+# Nao ha dependencias obrigatorias.
+#
+# Dependencias opcionais de desenvolvimento:
+#   pip install -e ".[dev]"

@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vestigium"
+version = "1.0.0"
+description = "Agente autonomo de analise forense e CTF (PCAP, LOG, SQLite, Stego, Crypto, Warmup, Phishing, Cadeia, Dropper)."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+  { name = "Joaquim Pedro de Morais Filho", email = "j360074@hotmail.com" },
+]
+keywords = ["forensics", "ctf", "pentest", "dfir", "pcap", "steganography",
+            "phishing", "malware", "incident-response"]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Environment :: Console",
+  "Intended Audience :: Information Technology",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Topic :: Security",
+]
+dependencies = []  # nucleo 100% biblioteca padrao
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.urls]
+Homepage = "https://elevbit-ai.github.io/vestigium/"
+Repository = "https://github.com/elevbit-ai/vestigium"
+
+[project.scripts]
+vestigium = "vestigium.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

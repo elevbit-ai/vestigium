@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vestigium — Agente Autônomo de Análise Forense</title>
+<meta name="description" content="Vestigium: agente autônomo que ingere evidências, detecta e correlaciona ataques (PCAP, LOG, SQLite, Stego, Crypto, Warmup, Phishing, Cadeia, Dropper) e gera um relatório forense profissional. Por Joaquim Pedro de Morais Filho.">
+<meta property="og:title" content="Vestigium — Agente Autônomo de Análise Forense">
+<meta property="og:description" content="Ingere evidências, detecta e correlaciona ataques, e gera um relatório profissional completo.">
+<meta property="og:type" content="website">
+<style>
+:root{
+  --bg:#0a0f1f; --bg2:#0e1530; --panel:#131b38; --panel2:#1a2450;
+  --txt:#eaeefb; --muted:#93a0c4; --line:#26305a; --accent:#6ea8fe;
+  --accent2:#8b7dff; --green:#4ade80; --red:#ff6b6b; --amber:#fbbf24;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font:16px/1.65 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+     background:var(--bg);color:var(--txt);-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+.wrap{max-width:1080px;margin:0 auto;padding:0 22px}
+code,pre{font-family:"JetBrains Mono",Consolas,Menlo,monospace}
+
+/* nav */
+nav{position:sticky;top:0;z-index:20;backdrop-filter:blur(10px);
+    background:rgba(10,15,31,.8);border-bottom:1px solid var(--line)}
+nav .wrap{display:flex;align-items:center;justify-content:space-between;height:60px}
+.brand{font-weight:800;font-size:18px;letter-spacing:.4px}
+.brand span{color:var(--accent)}
+.navlinks a{color:var(--muted);margin-left:22px;font-size:14px}
+.navlinks a:hover{color:var(--txt);text-decoration:none}
+.navlinks .gh{color:var(--txt);border:1px solid var(--line);padding:7px 14px;border-radius:8px}
+@media(max-width:640px){.navlinks a:not(.gh){display:none}}
+
+/* hero */
+header.hero{position:relative;overflow:hidden;
+  background:radial-gradient(1200px 500px at 70% -10%,rgba(110,168,254,.18),transparent),
+             radial-gradient(900px 400px at 10% 10%,rgba(139,125,255,.14),transparent)}
+.hero .wrap{padding:86px 22px 70px;text-align:center}
+.eyebrow{display:inline-block;font-size:13px;letter-spacing:2px;text-transform:uppercase;
+  color:var(--accent);border:1px solid var(--line);border-radius:20px;padding:6px 16px;margin-bottom:26px}
+.hero h1{font-size:clamp(38px,7vw,68px);line-height:1.05;letter-spacing:-1px;font-weight:850}
+.hero h1 .grad{background:linear-gradient(120deg,var(--accent),var(--accent2));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p.lead{max-width:680px;margin:22px auto 0;font-size:19px;color:var(--muted)}
+.cta{margin-top:36px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+.btn{padding:13px 26px;border-radius:10px;font-weight:600;font-size:15px}
+.btn.primary{background:linear-gradient(120deg,var(--accent),var(--accent2));color:#06122e}
+.btn.primary:hover{text-decoration:none;filter:brightness(1.08)}
+.btn.ghost{border:1px solid var(--line);color:var(--txt)}
+.btn.ghost:hover{text-decoration:none;background:var(--panel)}
+.pills{margin-top:44px;display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+.pill{font-size:13px;color:var(--muted);background:var(--panel);border:1px solid var(--line);
+  padding:7px 14px;border-radius:20px}
+.pill b{color:var(--txt)}
+
+/* sections */
+section{padding:74px 0;border-top:1px solid var(--line)}
+.kicker{color:var(--accent);font-weight:700;font-size:13px;letter-spacing:2px;
+  text-transform:uppercase;text-align:center}
+h2.title{font-size:clamp(28px,4vw,40px);text-align:center;margin:10px auto 8px;letter-spacing:-.5px}
+.sub{color:var(--muted);text-align:center;max-width:640px;margin:0 auto 46px}
+
+/* agent flow */
+.flow{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+@media(max-width:860px){.flow{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:460px){.flow{grid-template-columns:1fr}}
+.step{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px 18px;position:relative}
+.step .n{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-weight:800;
+  background:linear-gradient(120deg,var(--accent),var(--accent2));color:#06122e;margin-bottom:14px}
+.step h3{font-size:16px;margin-bottom:6px}
+.step p{font-size:13.5px;color:var(--muted)}
+
+/* categories */
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media(max-width:860px){.grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:520px){.grid{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px;
+  transition:transform .15s,border-color .15s}
+.card:hover{transform:translateY(-4px);border-color:var(--accent)}
+.card .ico{font-size:26px;margin-bottom:12px}
+.card h3{font-size:17px;margin-bottom:8px}
+.card h3 small{color:var(--accent);font-weight:600;font-size:12px;display:block;letter-spacing:1px;text-transform:uppercase}
+.card p{font-size:14px;color:var(--muted)}
+
+/* quickstart */
+.terminal{background:#060a17;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.terminal .bar{display:flex;gap:8px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.dot{width:12px;height:12px;border-radius:50%}
+.dot.r{background:#ff5f57}.dot.y{background:#febc2e}.dot.g{background:#28c840}
+.terminal pre{padding:20px 22px;overflow-x:auto;font-size:14px;line-height:1.7;color:#cdd7f5}
+.terminal .c{color:var(--muted)}
+.terminal .p{color:var(--green)}
+.terminal .o{color:var(--amber)}
+.terminal .f{color:var(--accent)}
+
+/* features two-col */
+.two{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center}
+@media(max-width:820px){.two{grid-template-columns:1fr}}
+.two ul{list-style:none}
+.two li{padding:12px 0 12px 34px;position:relative;border-bottom:1px solid var(--line)}
+.two li:before{content:"✓";position:absolute;left:0;top:12px;color:var(--green);
+  font-weight:800;background:rgba(74,222,128,.12);width:22px;height:22px;border-radius:6px;
+  display:grid;place-items:center;font-size:12px}
+.two li b{display:block}
+.two li span{color:var(--muted);font-size:14px}
+
+/* report preview */
+.preview{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:26px}
+.riskbar .track{height:14px;background:var(--panel2);border-radius:8px;overflow:hidden;border:1px solid var(--line)}
+.riskbar .fill{height:100%;width:100%;background:linear-gradient(90deg,#22c55e,#eab308,#f97316,#ef4444)}
+.riskbar .lab{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-bottom:8px}
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin:22px 0}
+@media(max-width:520px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stat{background:var(--bg2);border:1px solid var(--line);border-left:4px solid;border-radius:10px;padding:14px;text-align:center}
+.stat .num{font-size:26px;font-weight:800}
+.stat .lbl{font-size:12px;color:var(--muted)}
+.flagbox{background:#0f2519;border:1px solid #1f7a4d;border-radius:12px;padding:16px;margin-top:6px}
+.flagbox h4{color:var(--green);margin-bottom:10px;font-size:14px}
+.flagbox code{display:inline-block;background:#0a1c13;color:#86efac;padding:4px 10px;margin:4px;border-radius:6px;font-size:13px}
+
+/* footer */
+footer{border-top:1px solid var(--line);padding:50px 0 60px;text-align:center;color:var(--muted)}
+footer .brand{font-size:22px;margin-bottom:8px}
+footer a{color:var(--accent)}
+.disc{max-width:620px;margin:22px auto 0;font-size:13px;background:var(--panel);
+  border:1px solid var(--line);border-radius:12px;padding:16px 20px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <div class="brand">🔎 Vesti<span>gium</span></div>
+  <div class="navlinks">
+    <a href="#agente">Como funciona</a>
+    <a href="#categorias">Categorias</a>
+    <a href="#uso">Uso</a>
+    <a href="#relatorio">Relatório</a>
+    <a class="gh" href="https://github.com/elevbit-ai/vestigium">GitHub ↗</a>
+  </div>
+</div></nav>
+
+<header class="hero"><div class="wrap">
+  <span class="eyebrow">Agente autônomo de análise forense</span>
+  <h1>Aponte para as evidências.<br><span class="grad">O agente faz o resto.</span></h1>
+  <p class="lead">O Vestigium ingere qualquer conjunto de evidências, detecta e
+     correlaciona ataques em nove categorias e entrega um relatório forense
+     profissional — em segundos, sem dependências.</p>
+  <div class="cta">
+    <a class="btn primary" href="https://github.com/elevbit-ai/vestigium">Ver no GitHub</a>
+    <a class="btn ghost" href="#uso">Começar agora</a>
+  </div>
+  <div class="pills">
+    <span class="pill"><b>PCAP</b></span>
+    <span class="pill"><b>LOG</b></span>
+    <span class="pill"><b>SQLite</b></span>
+    <span class="pill"><b>Stego</b></span>
+    <span class="pill"><b>Crypto</b></span>
+    <span class="pill"><b>Warmup</b></span>
+    <span class="pill"><b>Phishing</b></span>
+    <span class="pill"><b>Cadeia</b></span>
+    <span class="pill"><b>Dropper</b></span>
+  </div>
+</div></header>
+
+<!-- AGENTE -->
+<section id="agente"><div class="wrap">
+  <div class="kicker">Como funciona</div>
+  <h2 class="title">Um agente, cinco etapas</h2>
+  <p class="sub">O Vestigium não é um script isolado por tipo de arquivo. É um agente
+     que percebe, decide, age e correlaciona — registrando cada decisão numa trilha auditável.</p>
+  <div class="flow">
+    <div class="step"><div class="n">1</div><h3>Percepção</h3>
+      <p>Coleta os arquivos, calcula SHA-256 e entropia, e identifica o tipo real por <em>magic bytes</em> — não pela extensão.</p></div>
+    <div class="step"><div class="n">2</div><h3>Roteamento</h3>
+      <p>Decide quais analisadores se aplicam a cada evidência, evitando trabalho inútil.</p></div>
+    <div class="step"><div class="n">3</div><h3>Análise</h3>
+      <p>Cada analisador emite achados com severidade, prova, IOCs, técnica MITRE ATT&amp;CK e recomendação.</p></div>
+    <div class="step"><div class="n">4</div><h3>Correlação</h3>
+      <p>O módulo <b>Cadeia</b> cruza IOCs entre evidências e reconstrói as fases da <em>kill chain</em>.</p></div>
+    <div class="step"><div class="n">5</div><h3>Síntese</h3>
+      <p>Calcula o índice de risco (0–100) e gera o relatório em HTML, Markdown e JSON.</p></div>
+  </div>
+</div></section>
+
+<!-- CATEGORIAS -->
+<section id="categorias"><div class="wrap">
+  <div class="kicker">Detecção</div>
+  <h2 class="title">Nove analisadores especializados</h2>
+  <p class="sub">Cobrindo as categorias clássicas de forense, CTF e resposta a incidentes.</p>
+  <div class="grid">
+    <div class="card"><div class="ico">🔥</div><h3><small>Warmup</small>Triagem inicial</h3>
+      <p>Strings, bandeiras em claro, IOCs, extensão incompatível com o conteúdo e blocos codificados embutidos.</p></div>
+    <div class="card"><div class="ico">🌐</div><h3><small>PCAP</small>Rede</h3>
+      <p>Parser próprio de pcap/pcapng: DNS, HTTP em claro, <b>credenciais em claro</b>, tunelamento e <b>beaconing</b> de C2.</p></div>
+    <div class="card"><div class="ico">📜</div><h3><small>Log</small>Ataques web</h3>
+      <p>SQLi, XSS, path traversal, LFI/RFI, injeção de comando, Log4Shell, varredura e <b>força bruta</b>.</p></div>
+    <div class="card"><div class="ico">🗄️</div><h3><small>SQLite</small>Banco de dados</h3>
+      <p>Tabelas sensíveis, hashes, PII, bandeiras e <b>carving</b> de registros apagados.</p></div>
+    <div class="card"><div class="ico">🖼️</div><h3><small>Stego</small>Esteganografia</h3>
+      <p>Dados após o EOF, arquivos embutidos/polyglot, metadados, LSB e assinaturas de ferramentas.</p></div>
+    <div class="card"><div class="ico">🔐</div><h3><small>Crypto</small>Criptografia</h3>
+      <p>base64/base32/hex aninhado, ROT/Caesar, Atbash, <b>XOR byte único</b>, Morse, PEM e hashes.</p></div>
+    <div class="card"><div class="ico">🎣</div><h3><small>Phishing</small>Engenharia social</h3>
+      <p>SPF/DKIM/DMARC, spoofing, domínios sósia, links mascarados, captura de credenciais e anexos perigosos.</p></div>
+    <div class="card"><div class="ico">💉</div><h3><small>Dropper</small>Malware</h3>
+      <p>PowerShell/macros ofuscados, LOLBins, download de estágios, <b>desofuscação</b> e PE de alta entropia.</p></div>
+    <div class="card"><div class="ico">🔗</div><h3><small>Cadeia</small>Correlação</h3>
+      <p>Liga IOCs entre evidências e <b>reconstrói a cadeia de ataque</b> (kill chain / MITRE ATT&amp;CK).</p></div>
+  </div>
+</div></section>
+
+<!-- USO -->
+<section id="uso"><div class="wrap">
+  <div class="kicker">Comece em 30 segundos</div>
+  <h2 class="title">Instale e rode</h2>
+  <p class="sub">Núcleo 100% biblioteca padrão do Python 3.9+. Sem dependências para instalar.</p>
+  <div class="terminal">
+    <div class="bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div>
+    <pre><span class="c"># 1. clonar e instalar</span>
+<span class="p">$</span> git clone https://github.com/elevbit-ai/vestigium.git
+<span class="p">$</span> cd vestigium && pip install -e .
+
+<span class="c"># 2. analisar uma pasta de evidências</span>
+<span class="p">$</span> vestigium scan ./evidencias -o relatorio/
+
+<span class="o">============================================================
+  RISCO: Critico (100/100)
+  Evidencias: 8 | Achados: 47 | Tempo: 3.1s
+  Bandeiras: </span><span class="f">flag{trafego_em_claro}</span><span class="o">, </span><span class="f">flag{apos_o_eof}</span><span class="o">, ...
+============================================================</span>
+
+<span class="c"># 3. abrir o relatório profissional</span>
+<span class="p">$</span> start relatorio/relatorio.html</pre>
+  </div>
+</div></section>
+
+<!-- WHY -->
+<section><div class="wrap">
+  <div class="two">
+    <div>
+      <div class="kicker" style="text-align:left">Por que Vestigium</div>
+      <h2 class="title" style="text-align:left;margin-left:0">Feito para o mundo real</h2>
+      <p class="sub" style="text-align:left;margin:0 0 10px">Da mesa de CTF à sala de resposta a incidentes.</p>
+    </div>
+    <ul>
+      <li><b>Funciona como agente</b><span>Ciclo de decisão auditável, não um punhado de scripts soltos.</span></li>
+      <li><b>Zero dependências</b><span>Roda em qualquer Python 3.9+, em Windows, Linux ou macOS.</span></li>
+      <li><b>Mapeado a MITRE ATT&amp;CK</b><span>Cada achado aponta a técnica correspondente.</span></li>
+      <li><b>Relatório pronto para entrega</b><span>HTML imprimível, Markdown e JSON para automação/CI.</span></li>
+      <li><b>Recupera bandeiras sozinho</b><span>Decodifica e desofusca camadas até revelar a flag.</span></li>
+    </ul>
+  </div>
+</div></section>
+
+<!-- RELATORIO -->
+<section id="relatorio"><div class="wrap">
+  <div class="kicker">O entregável</div>
+  <h2 class="title">Um relatório que você pode entregar</h2>
+  <p class="sub">Índice de risco, sumário executivo, achados detalhados, IOCs, cadeia de custódia e a trilha do agente.</p>
+  <div class="preview">
+    <div class="riskbar">
+      <div class="lab"><span>Índice de risco</span><span>Crítico — 100/100</span></div>
+      <div class="track"><div class="fill"></div></div>
+    </div>
+    <div class="stats">
+      <div class="stat" style="border-color:#ef4444"><div class="num" style="color:#ef4444">4</div><div class="lbl">Crítica</div></div>
+      <div class="stat" style="border-color:#f97316"><div class="num" style="color:#f97316">26</div><div class="lbl">Alta</div></div>
+      <div class="stat" style="border-color:#eab308"><div class="num" style="color:#eab308">5</div><div class="lbl">Média</div></div>
+      <div class="stat" style="border-color:#22c55e"><div class="num" style="color:#22c55e">2</div><div class="lbl">Baixa</div></div>
+      <div class="stat" style="border-color:#3b82f6"><div class="num" style="color:#3b82f6">10</div><div class="lbl">Info</div></div>
+    </div>
+    <div class="flagbox">
+      <h4>🚩 Bandeiras recuperadas automaticamente</h4>
+      <code>flag{trafego_em_claro}</code><code>flag{apos_o_eof}</code>
+      <code>flag{base64_aninhado}</code><code>flag{registro_no_banco}</code>
+      <code>flag{rot_treze}</code><code>flag{warmup_direto}</code>
+    </div>
+  </div>
+</div></section>
+
+<footer><div class="wrap">
+  <div class="brand">🔎 Vesti<span style="color:var(--accent)">gium</span></div>
+  <p>Agente autônomo de análise forense e CTF.</p>
+  <p style="margin-top:14px">Criado por <b>Joaquim Pedro de Morais Filho</b> ·
+     <a href="mailto:j360074@hotmail.com">j360074@hotmail.com</a> ·
+     <a href="https://github.com/elevbit-ai/vestigium">GitHub</a></p>
+  <div class="disc">⚖️ Ferramenta defensiva e educacional. Use apenas em sistemas e
+     dados sobre os quais você tem autorização explícita — CTFs, laboratórios e
+     investigações consentidas.</div>
+  <p style="margin-top:20px;font-size:13px">© 2026 Joaquim Pedro de Morais Filho — Licença MIT</p>
+</div></footer>
+
+</body>
+</html>
