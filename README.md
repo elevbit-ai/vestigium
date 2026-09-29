@@ -132,7 +132,11 @@ O que o `recon` faz:
 | **Portas** | Varredura TCP *connect* das portas comuns (ou 1–1024 com `--full-ports`); destaca serviços sensíveis expostos. |
 | **Serviços** | Coleta de banner e identificação de serviço/versão. |
 | **HTTP** | Cabeçalhos de segurança ausentes (HSTS, CSP, X-Frame-Options…), divulgação de versão e cookies sem flags. |
+| **Tecnologias** | Identificação de CMS e stack (WordPress, Drupal, Laravel, Django, ASP.NET, React/Angular…) por cabeçalhos, cookies e HTML. |
+| **WAF/CDN** | Detecção de WAF/CDN (Cloudflare, Akamai, Imperva, AWS, F5, Fortinet, ModSecurity…). |
 | **TLS** | Protocolo negociado (alerta TLS < 1.2) e validade do certificado. |
+| **DNS** | Enumeração de registros (A/MX/NS/TXT) e higiene de e-mail — alerta para MX sem SPF/DMARC. |
+| **SNMP** | Verifica exposição de SNMP com a *community* padrão `public` (somente leitura, sem força bruta). |
 | **Descoberta** | GET não destrutivo de caminhos sensíveis (`.git`, `.env`, `server-status`, backups, painéis…). |
 
 **Salvaguardas de segurança embutidas** — este modo **não** é uma ferramenta de ataque:

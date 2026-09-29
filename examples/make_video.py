@@ -130,7 +130,7 @@ def s_intro(d, t, dur):
     scale = lerp(0.85, 1.0, ease((t - 0.2) / 1.0))
     magnifier(d, cx, 380, int(70 * scale), 9, ACCENT, a)
     text(d, (cx, 520), "VESTIGIUM", bold(120), TXT, a, anchor="mm")
-    text(d, (cx, 610), "agente autonomo de analise forense e CTF",
+    text(d, (cx, 610), "agente autonomo de forense, CTF e pentest",
          reg(40), MUTED, a * appear(t, 0.9, 0.8), anchor="mm")
     cats = "PCAP   LOG   SQLite   Stego   Crypto   Warmup   Phishing   Cadeia   Dropper"
     text(d, (cx, 700), cats, semi(28), ACCENT,
@@ -387,6 +387,98 @@ def s_outro(d, t, dur):
          reg(30), MUTED, a * appear(t, 1.5, 0.6), anchor="mm")
 
 
+PENTEST_CAPS = [
+    ("Portas", "connect scan"),
+    ("Servicos", "banner e versao"),
+    ("HTTP", "headers de seguranca"),
+    ("TLS", "certificado e protocolo"),
+    ("Descoberta", ".git, .env, backups"),
+    ("DNS", "SPF/DMARC, registros"),
+    ("Tecnologias", "CMS e stack"),
+    ("WAF", "protecao detectada"),
+]
+
+
+def s_pentest_intro(d, t, dur):
+    watermark(d)
+    a_out = disappear(t, dur - 0.6, 0.6)
+    cx = W / 2
+    text(d, (cx, 120), "Tambem faz pentest", bold(60), TXT,
+         appear(t, 0.1, 0.6) * a_out, anchor="mm")
+    text(d, (cx, 190), "Reconhecimento nao destrutivo de um alvo autorizado",
+         reg(32), MUTED, appear(t, 0.4, 0.6) * a_out, anchor="mm")
+
+    cols = 4
+    cw, ch, gap = 400, 150, 30
+    total = cols * cw + (cols - 1) * gap
+    x0 = (W - total) / 2
+    y0 = 290
+    for i, (name, desc) in enumerate(PENTEST_CAPS):
+        r, c = divmod(i, cols)
+        bx = x0 + c * (cw + gap)
+        by = y0 + r * (ch + gap)
+        aa = appear(t, 0.6 + i * 0.16, 0.4) * a_out
+        rounded(d, [bx, by, bx + cw, by + ch], 16, PANEL, LINE, 2, aa)
+        d.rounded_rectangle([bx, by, bx + 8, by + ch], radius=4, fill=col(ORANGE, aa))
+        text(d, (bx + 40, by + 55), name, bold(34), TXT, aa, anchor="lm")
+        text(d, (bx + 40, by + 105), desc, reg(26), MUTED, aa, anchor="lm")
+
+    sa = appear(t, 2.2, 0.6) * a_out
+    by = y0 + 2 * (ch + gap) + 20
+    rounded(d, [x0, by, x0 + total, by + 92], 14, (26, 15, 20), RED, 2, sa)
+    text(d, (cx, by + 46),
+         "Exige --authorize   -   um unico alvo (sem CIDR)   -   sem exploracao, "
+         "forca bruta ou DoS",
+         semi(27), (255, 150, 150), sa, anchor="mm")
+
+
+PENTEST_TERM = [
+    ("$ vestigium recon exemplo.com --authorize -o pentest/", GREEN, 0.3),
+    ("[10:20] Autorizacao confirmada para: exemplo.com", ACCENT, 1.4),
+    ("[10:20] Escopo: 1 alvo; sem exploracao/brute force/DoS", MUTED, 2.2),
+    ("[10:20] Portas abertas: 80, 443", MUTED, 3.0),
+    ("  + tecnologias: WordPress, nginx, PHP", TXT, 3.7),
+    ("  + waf: Cloudflare detectado", TXT, 4.3),
+    ("  + http: 5 cabecalhos de seguranca ausentes", TXT, 5.0),
+    ("  + tls: certificado expira em 12 dia(s)", TXT, 5.7),
+    ("  + descoberta: /.git exposto", TXT, 6.4),
+    ("  + dns: MX sem SPF/DMARC", TXT, 7.1),
+]
+
+
+def s_pentest_terminal(d, t, dur):
+    watermark(d)
+    a_out = disappear(t, dur - 0.6, 0.6)
+    cx = W / 2
+    tx0, ty0, tx1, ty1 = 240, 140, W - 240, H - 170
+    win_a = appear(t, 0.1, 0.5) * a_out
+    rounded(d, [tx0, ty0, tx1, ty1], 18, (6, 10, 23), LINE, 2, win_a)
+    d.line([tx0, ty0 + 56, tx1, ty0 + 56], fill=col(LINE, win_a), width=2)
+    for i, dc in enumerate([RED, AMBER, GREEN]):
+        d.ellipse([tx0 + 28 + i * 30, ty0 + 20, tx0 + 44 + i * 30, ty0 + 36],
+                  fill=col(dc, win_a))
+    text(d, (cx, ty0 + 28), "vestigium - recon (pentest)", mono(26), MUTED,
+         win_a, anchor="mm")
+
+    f = mono(29)
+    ly = ty0 + 96
+    for txt_line, c, start in PENTEST_TERM:
+        if t < start:
+            continue
+        chars = int(clamp((t - start) / 0.5) * len(txt_line))
+        text(d, (tx0 + 40, ly), txt_line[:chars], f, c, win_a, anchor="lm")
+        ly += 46
+
+    ra = appear(t, 7.8, 0.6) * a_out
+    if ra > 0:
+        by = ty1 - 120
+        rounded(d, [tx0 + 30, by, tx1 - 30, ty1 - 30], 14, (30, 20, 10), ORANGE, 2, ra)
+        text(d, (tx0 + 60, by + 45), "RISCO: ALTO  67/100",
+             monob(38), ORANGE, ra, anchor="lm")
+        text(d, (tx1 - 60, by + 45), "pentest autorizado - nao destrutivo",
+             mono(28), MUTED, ra, anchor="rm")
+
+
 # ---------------------------------------------------------------- timeline
 TIMELINE = [
     (s_intro, 5.0),
@@ -395,6 +487,8 @@ TIMELINE = [
     (s_analyzers, 10.5),
     (s_terminal, 14.0),
     (s_report, 10.0),
+    (s_pentest_intro, 9.0),
+    (s_pentest_terminal, 12.0),
     (s_outro, 5.5),
 ]
 TOTAL = sum(d for _, d in TIMELINE)

@@ -31,7 +31,10 @@ def _free_port():
 def web_server(tmp_path):
     root = tmp_path / "webroot"
     root.mkdir()
-    (root / "index.html").write_text("<h1>alvo</h1>")
+    (root / "index.html").write_text(
+        '<html><head><meta name="generator" content="WordPress 6.4">'
+        '</head><body><link href="/wp-content/theme/x.css"><h1>alvo</h1>'
+        '</body></html>')
     (root / "robots.txt").write_text("User-agent: *\nDisallow: /x")
     (root / ".env").write_text("DB_PASSWORD=segredo\nAPI_KEY=abc")
     gitdir = root / ".git"
@@ -73,3 +76,13 @@ def test_recon_detects_exposures(tmp_path, web_server):
     assert "cabecalho" in titles                  # headers de seguranca
     assert any(f.category == "portas" for f in result.findings)
     assert result.risk_score > 0
+    # deteccao de tecnologias/CMS a partir do HTML
+    assert any(f.category == "tecnologias" for f in result.findings)
+    assert "wordpress" in titles
+
+
+def test_probes_degrade_gracefully():
+    from vestigium.offensive.probes import dns_query, snmp_get
+    # nao deve lancar excecao; retorna vazio/None quando nao ha resposta
+    assert dns_query("nao-existe.invalido.teste", "A", timeout=1.0) == []
+    assert snmp_get("127.0.0.1", "public", timeout=1.0) is None

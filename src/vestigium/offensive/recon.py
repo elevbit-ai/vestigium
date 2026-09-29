@@ -206,6 +206,13 @@ class ReconAgent:
             if port in TLS_PORTS:
                 findings += self._tls_checks(tgt.host, port, trace)
 
+        # DNS (apenas se o alvo for um dominio) e SNMP (UDP 161)
+        if not tgt.host[0].isdigit():
+            self._log(trace, "Enumeracao DNS do dominio")
+            findings += self._dns_checks(tgt, trace)
+        self._log(trace, "Sondagem SNMP (community padrao 'public')")
+        findings += self._snmp_check(tgt.host, trace)
+
         findings.sort(key=lambda f: (-int(f.severity), f.category))
         finished = time.time()
         result = ScanResult(target=f"{tgt.host} ({ip})", started=started,
@@ -325,8 +332,9 @@ class ReconAgent:
         headers = {k.lower(): v for k, v in resp.headers.items()}
         setck_all = resp.headers.get_all("Set-Cookie") or []
         self._log(trace, f"  HTTP {url}: {getattr(resp, 'status', '?')}")
+        body = ""
         try:
-            resp.read()          # drena e permite fechar a conexao
+            body = resp.read(262144).decode("latin-1", "replace")  # ate 256 KB
         except Exception:
             pass
         finally:
@@ -377,7 +385,162 @@ class ReconAgent:
                     recommendation="Definir Secure, HttpOnly e SameSite nos cookies.",
                     tags=["cookie"],
                 ))
+
+        # Tecnologias/CMS e WAF (reaproveitam a mesma resposta)
+        out += self._tech_fingerprint(url, headers, setck_all, body, trace)
+        out += self._waf_detect(url, headers, setck_all, trace)
         return out
+
+    # ---------------------------------------------------------------
+    def _tech_fingerprint(self, url, headers, cookies, body, trace) -> list[Finding]:
+        import re
+        ck = " ".join(cookies).lower()
+        found: dict[str, str] = {}
+
+        def add(name, why):
+            found.setdefault(name, why)
+
+        # cabecalhos reveladores
+        srv = headers.get("server", "")
+        xpb = headers.get("x-powered-by", "")
+        if srv:
+            add(srv.split()[0].split("/")[0].capitalize(), f"Server: {srv}")
+        if xpb:
+            add(xpb.split("/")[0], f"X-Powered-By: {xpb}")
+        if "x-generator" in headers:
+            add(headers["x-generator"].split("/")[0], "X-Generator")
+        if "x-drupal-cache" in headers or "x-drupal-dynamic-cache" in headers:
+            add("Drupal", "cabecalho X-Drupal")
+        if "x-aspnet-version" in headers:
+            add("ASP.NET", "X-AspNet-Version")
+
+        # cookies reveladores
+        for pat, name in (("wordpress_", "WordPress"), ("wp-settings", "WordPress"),
+                          ("laravel_session", "Laravel"), ("csrftoken", "Django"),
+                          ("_rails", "Ruby on Rails"), ("jsessionid", "Java (JSP/Servlet)"),
+                          ("phpsessid", "PHP"), ("aspxauth", "ASP.NET"),
+                          ("connect.sid", "Node.js/Express")):
+            if pat in ck:
+                add(name, f"cookie {pat}")
+
+        # corpo / metatags / caminhos
+        blow = body.lower()
+        mg = re.search(r'<meta[^>]+name=["\']generator["\'][^>]+content=["\']([^"\']+)',
+                       body, re.I)
+        if mg:
+            add(mg.group(1).split()[0], f"meta generator: {mg.group(1)[:60]}")
+        for pat, name in (("/wp-content/", "WordPress"), ("/wp-includes/", "WordPress"),
+                          ("/sites/all/", "Drupal"), ("/media/jui/", "Joomla"),
+                          ("/typo3/", "TYPO3"), ("cdn.shopify.com", "Shopify"),
+                          ("wix.com", "Wix"), ("__next", "Next.js"),
+                          ("data-reactroot", "React"), ("ng-version", "Angular"),
+                          ("jquery", "jQuery"), ("wp-json", "WordPress")):
+            if pat in blow:
+                add(name, f"padrao '{pat}' no HTML")
+
+        if not found:
+            return []
+        self._log(trace, f"  tecnologias: {', '.join(found)}")
+        return [Finding(
+            analyzer="recon", category="tecnologias",
+            title=f"Tecnologias/CMS identificados: {', '.join(list(found)[:8])}",
+            severity=Severity.INFO, source=url,
+            description="Pilha tecnologica inferida a partir da resposta HTTP.",
+            evidence="; ".join(f"{k} ({v})" for k, v in list(found.items())[:8]),
+            tags=["fingerprint"], mitre=["T1592.002"],
+            recommendation="Reduzir divulgacao de tecnologias; manter tudo atualizado.",
+            data={"tech": list(found)},
+        )]
+
+    def _waf_detect(self, url, headers, cookies, trace) -> list[Finding]:
+        ck = " ".join(cookies).lower()
+        hdr_blob = " ".join(f"{k}:{v}" for k, v in headers.items()).lower()
+        waf = None
+        for name, needles in (
+            ("Cloudflare", ("cf-ray", "server:cloudflare", "__cfduid", "cf-cache-status")),
+            ("Akamai", ("akamai", "x-akamai", "aka-")),
+            ("Imperva/Incapsula", ("x-iinfo", "incap_ses", "visid_incap", "x-cdn:incapsula")),
+            ("Sucuri", ("x-sucuri-id", "x-sucuri-cache", "sucuri")),
+            ("AWS WAF/ALB", ("awselb", "x-amzn-requestid", "x-amz-cf-id")),
+            ("F5 BIG-IP ASM", ("bigipserver", "x-waf-event", "ts01")),
+            ("Fortinet FortiWeb", ("fortiwafsid", "fortigate")),
+            ("Barracuda", ("barra_counter", "barracuda")),
+            ("ModSecurity", ("mod_security", "modsecurity", "server:mod_security")),
+        ):
+            if any(n in hdr_blob or n in ck for n in needles):
+                waf = name
+                break
+        if not waf:
+            return []
+        self._log(trace, f"  WAF detectado: {waf}")
+        return [Finding(
+            analyzer="recon", category="waf",
+            title=f"WAF/CDN detectado: {waf}",
+            severity=Severity.INFO, source=url,
+            description="Camada de protecao identificada por cabecalhos/cookies.",
+            tags=["waf"], mitre=["T1590.002"],
+            recommendation="Confirmar que o WAF esta em modo de bloqueio, nao so deteccao.",
+        )]
+
+    def _dns_checks(self, tgt, trace) -> list[Finding]:
+        from .probes import dns_query
+        domain = tgt.host
+        out = []
+        a = dns_query(domain, "A")
+        mx = dns_query(domain, "MX")
+        ns = dns_query(domain, "NS")
+        txt = dns_query(domain, "TXT")
+        dmarc = dns_query(f"_dmarc.{domain}", "TXT")
+        self._log(trace, f"  DNS {domain}: A={len(a)} MX={len(mx)} NS={len(ns)} TXT={len(txt)}")
+
+        records = {"A": a, "MX": mx, "NS": ns, "TXT": txt}
+        details = "; ".join(f"{k}={v[:3]}" for k, v in records.items() if v)
+        if details:
+            out.append(Finding(
+                analyzer="recon", category="dns",
+                title="Registros DNS enumerados",
+                severity=Severity.INFO, source=domain,
+                evidence=details[:400], tags=["dns"], mitre=["T1590.002"],
+                iocs={"domain": ns + [m.split()[-1] for m in mx if m]},
+            ))
+        # Higiene de e-mail: SPF/DMARC
+        has_spf = any("v=spf1" in t.lower() for t in txt)
+        has_dmarc = any("v=dmarc1" in t.lower() for t in dmarc)
+        if mx and not has_spf:
+            out.append(Finding(
+                analyzer="recon", category="dns",
+                title="Dominio com MX mas sem registro SPF",
+                severity=Severity.MEDIUM, source=domain,
+                description="Ausencia de SPF facilita spoofing de e-mail.",
+                recommendation="Publicar um registro SPF (v=spf1 ...).",
+                tags=["email-security"], mitre=["T1566"],
+            ))
+        if mx and not has_dmarc:
+            out.append(Finding(
+                analyzer="recon", category="dns",
+                title="Dominio com MX mas sem registro DMARC",
+                severity=Severity.MEDIUM, source=domain,
+                description="Sem DMARC nao ha politica de tratamento de falsificacao.",
+                recommendation="Publicar _dmarc com politica p=quarantine/reject.",
+                tags=["email-security"], mitre=["T1566"],
+            ))
+        return out
+
+    def _snmp_check(self, host, trace) -> list[Finding]:
+        from .probes import snmp_get
+        desc = snmp_get(host, "public", timeout=self.timeout)
+        if desc is None:
+            return []
+        self._log(trace, f"  SNMP {host}: exposto (community 'public')")
+        return [Finding(
+            analyzer="recon", category="snmp",
+            title="SNMP exposto com community padrao 'public'",
+            severity=Severity.HIGH, source=f"{host}:161",
+            description="SNMP respondeu a leitura com a community padrao.",
+            evidence=desc[:160], tags=["exposure", "default-cred"],
+            mitre=["T1046"],
+            recommendation="Desabilitar SNMP externo; usar SNMPv3 com credenciais fortes.",
+        )]
 
     def _discovery(self, tgt, port, trace) -> list[Finding]:
         base = self._http_url(tgt, port).rstrip("/")
