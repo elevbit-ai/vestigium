@@ -38,6 +38,8 @@ a incidentes) e **triagem em pentest** — cobrindo nove categorias:
 O núcleo usa **somente a biblioteca padrão do Python** — sem dependências, sem
 instalar nada além do próprio pacote.
 
+> 🎬 **Veja o sistema inteiro em ~1 minuto:** [vídeo de demonstração](https://elevbit-ai.github.io/vestigium/#video) no website.
+
 ---
 
 ## Destaques
