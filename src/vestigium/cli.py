@@ -79,6 +79,58 @@ def cmd_scan(args) -> int:
     return 0
 
 
+def cmd_recon(args) -> int:
+    from .offensive import ReconAgent
+    from . import report as rp
+
+    if not args.quiet:
+        print(BANNER)
+        print("  MODO PENTEST - reconhecimento nao destrutivo (autorizado)\n")
+
+    if not args.authorize:
+        print("erro: reconhecimento requer autorizacao explicita.\n"
+              "      Use --authorize para confirmar que voce tem permissao\n"
+              "      para testar este alvo. Uso etico e autorizado apenas.",
+              file=sys.stderr)
+        return 2
+
+    out_dir = Path(args.output)
+    agent = ReconAgent(verbose=not args.quiet, timeout=args.timeout,
+                       max_threads=args.threads)
+    try:
+        result = agent.scan(args.target, out_dir, authorized=True,
+                            full_ports=args.full_ports)
+    except (ValueError, PermissionError) as exc:
+        print(f"erro: {exc}", file=sys.stderr)
+        return 2
+
+    formats = [f.strip() for f in args.formats.split(",") if f.strip()]
+    paths = {}
+    if "html" in formats:
+        p = out_dir / "pentest.html"
+        rp.write_html(result, p, rp.PENTEST)
+        paths["html"] = p
+    if "md" in formats:
+        p = out_dir / "pentest.md"
+        rp.write_markdown(result, p, rp.PENTEST)
+        paths["md"] = p
+    if "json" in formats:
+        p = out_dir / "pentest.json"
+        rp.write_json(result, p, rp.PENTEST)
+        paths["json"] = p
+
+    _print_summary(result)
+    print("\nRelatorios gerados:")
+    for fmt, p in paths.items():
+        print(f"  - {fmt.upper():4} {p}")
+
+    if args.fail_on:
+        threshold = Severity[args.fail_on.upper()]
+        if any(f.severity >= threshold for f in result.findings):
+            return 1
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="vestigium",
@@ -101,6 +153,32 @@ def build_parser() -> argparse.ArgumentParser:
                     help="retorna codigo 1 se houver achado >= severidade (para CI)")
     sc.add_argument("-q", "--quiet", action="store_true", help="silencia a trilha")
     sc.set_defaults(func=cmd_scan)
+
+    rc = sub.add_parser(
+        "recon",
+        help="pentest: reconhecimento nao destrutivo de UM alvo autorizado",
+        description="Reconhecimento de pentest (portas, servicos, HTTP, TLS, "
+                    "descoberta). Sem exploracao, forca bruta ou DoS. "
+                    "Requer autorizacao explicita (--authorize).",
+    )
+    rc.add_argument("target", help="um unico host/IP/URL autorizado (sem CIDR/listas)")
+    rc.add_argument("--authorize", action="store_true",
+                    help="confirma que voce tem permissao para testar o alvo")
+    rc.add_argument("-o", "--output", default="vestigium-pentest",
+                    help="diretorio de saida (padrao: vestigium-pentest)")
+    rc.add_argument("--formats", default="html,md,json",
+                    help="formatos separados por virgula (html,md,json)")
+    rc.add_argument("--full-ports", action="store_true",
+                    help="varre 1-1024 alem das portas comuns (mais lento)")
+    rc.add_argument("--timeout", type=float, default=2.0,
+                    help="timeout por conexao em segundos (padrao: 2.0)")
+    rc.add_argument("--threads", type=int, default=100,
+                    help="conexoes simultaneas na varredura (padrao: 100)")
+    rc.add_argument("--fail-on", metavar="SEV",
+                    choices=[s.name.lower() for s in Severity],
+                    help="retorna codigo 1 se houver achado >= severidade (para CI)")
+    rc.add_argument("-q", "--quiet", action="store_true", help="silencia a trilha")
+    rc.set_defaults(func=cmd_recon)
     return p
 
 

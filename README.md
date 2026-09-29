@@ -1,8 +1,8 @@
 <h1 align="center">🔎 Vestigium</h1>
 
 <p align="center">
-  <b>Agente autônomo de análise forense e CTF.</b><br>
-  Ingere evidências, detecta e correlaciona ataques, e gera um relatório profissional completo.
+  <b>Agente autônomo de análise forense, CTF e pentest.</b><br>
+  Ingere evidências ou avalia um alvo autorizado, detecta e correlaciona riscos, e gera um relatório profissional completo.
 </p>
 
 <p align="center">
@@ -107,6 +107,43 @@ imprimir em PDF.
 
 ---
 
+## Modo Pentest (reconhecimento)
+
+Além da análise forense (que recebe evidências já coletadas), o Vestigium tem um
+**modo ofensivo de reconhecimento** para testes de intrusão **autorizados**. Ele
+executa as fases seguras e **não destrutivas** de um pentest contra **um único
+alvo** e alimenta o mesmo relatório profissional.
+
+```bash
+# reconhecimento de um alvo autorizado (exige --authorize)
+vestigium recon exemplo.com --authorize -o pentest/
+
+# alvo com porta e formatos específicos
+vestigium recon 10.0.0.5:8080 --authorize --formats html,json
+
+# varredura ampla de portas (1-1024 + comuns)
+vestigium recon exemplo.com --authorize --full-ports
+```
+
+O que o `recon` faz:
+
+| Fase | Verificação |
+|------|-------------|
+| **Portas** | Varredura TCP *connect* das portas comuns (ou 1–1024 com `--full-ports`); destaca serviços sensíveis expostos. |
+| **Serviços** | Coleta de banner e identificação de serviço/versão. |
+| **HTTP** | Cabeçalhos de segurança ausentes (HSTS, CSP, X-Frame-Options…), divulgação de versão e cookies sem flags. |
+| **TLS** | Protocolo negociado (alerta TLS < 1.2) e validade do certificado. |
+| **Descoberta** | GET não destrutivo de caminhos sensíveis (`.git`, `.env`, `server-status`, backups, painéis…). |
+
+**Salvaguardas de segurança embutidas** — este modo **não** é uma ferramenta de ataque:
+
+- 🔒 Exige `--authorize` (confirmação explícita de permissão).
+- 🎯 Aceita **apenas um alvo** — **faixas CIDR e listas são rejeitadas** (sem alvo em massa).
+- 🚫 **Sem exploração**, sem força bruta de credenciais e **sem negação de serviço**.
+- 📋 Registra o escopo autorizado e toda a trilha de decisão no relatório.
+
+---
+
 ## Como o agente funciona
 
 O agente executa um ciclo determinístico e **registra cada decisão**:
@@ -176,8 +213,9 @@ vestigium/
 │   ├── findings.py       # modelo de achados e severidade
 │   ├── patterns.py       # regex de IOCs, flags e decodificadores
 │   ├── report.py         # relatório HTML / Markdown / JSON
-│   ├── cli.py            # linha de comando
-│   └── analyzers/        # os 9 analisadores
+│   ├── cli.py            # linha de comando (scan + recon)
+│   ├── analyzers/        # os 9 analisadores forenses
+│   └── offensive/        # modo pentest (reconhecimento)
 ├── examples/             # gerador de amostras + demo
 ├── tests/                # testes de fumaça
 └── docs/                 # website (GitHub Pages)
@@ -187,10 +225,13 @@ vestigium/
 
 ## Ética e uso responsável
 
-O Vestigium é uma ferramenta **defensiva e educacional**, para análise de
-evidências em **CTFs, laboratórios e investigações autorizadas**. Use-o apenas
-em sistemas e dados sobre os quais você tem permissão explícita. O autor não se
-responsabiliza por uso indevido.
+O Vestigium é uma ferramenta para **análise forense, CTF e testes de intrusão
+autorizados**. A análise forense é defensiva (opera sobre evidências já
+coletadas). O **modo pentest (`recon`) é ativo** e deve ser usado **somente**
+contra sistemas para os quais você tem **autorização explícita por escrito** —
+por isso ele exige `--authorize`, aceita apenas um alvo e não executa exploração,
+força bruta ou negação de serviço. Testar sistemas de terceiros sem permissão é
+ilegal. O autor não se responsabiliza por uso indevido.
 
 ---
 

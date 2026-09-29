@@ -41,7 +41,7 @@ class Severity(enum.IntEnum):
         }[self]
 
 
-# Categorias suportadas pelo agente (as pedidas pelo usuario).
+# Categorias forenses suportadas pelo agente.
 CATEGORIES = [
     "warmup",
     "pcap",
@@ -52,6 +52,16 @@ CATEGORIES = [
     "phishing",
     "dropper",
     "chain",
+]
+
+# Categorias do modo pentest (reconhecimento).
+RECON_CATEGORIES = [
+    "escopo",
+    "portas",
+    "servicos",
+    "http",
+    "tls",
+    "descoberta",
 ]
 
 

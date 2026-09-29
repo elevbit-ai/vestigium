@@ -137,6 +137,7 @@ footer a{color:var(--accent)}
     <a href="#video">Vídeo</a>
     <a href="#agente">Como funciona</a>
     <a href="#categorias">Categorias</a>
+    <a href="#pentest">Pentest</a>
     <a href="#uso">Uso</a>
     <a href="#relatorio">Relatório</a>
     <a class="gh" href="https://github.com/elevbit-ai/vestigium">GitHub ↗</a>
@@ -144,7 +145,7 @@ footer a{color:var(--accent)}
 </div></nav>
 
 <header class="hero"><div class="wrap">
-  <span class="eyebrow">Agente autônomo de análise forense</span>
+  <span class="eyebrow">Agente autônomo de análise forense e pentest</span>
   <h1>Aponte para as evidências.<br><span class="grad">O agente faz o resto.</span></h1>
   <p class="lead">O Vestigium ingere qualquer conjunto de evidências, detecta e
      correlaciona ataques em nove categorias e entrega um relatório forense
@@ -227,6 +228,51 @@ footer a{color:var(--accent)}
       <p>PowerShell/macros ofuscados, LOLBins, download de estágios, <b>desofuscação</b> e PE de alta entropia.</p></div>
     <div class="card"><div class="ico">🔗</div><h3><small>Cadeia</small>Correlação</h3>
       <p>Liga IOCs entre evidências e <b>reconstrói a cadeia de ataque</b> (kill chain / MITRE ATT&amp;CK).</p></div>
+  </div>
+</div></section>
+
+<!-- PENTEST -->
+<section id="pentest"><div class="wrap">
+  <div class="kicker">Modo ofensivo</div>
+  <h2 class="title">Também faz pentest</h2>
+  <p class="sub">Além da forense (que recebe evidências), o Vestigium avalia um alvo
+     autorizado nas fases seguras e não destrutivas de um teste de intrusão.</p>
+
+  <div class="grid" style="margin-bottom:28px">
+    <div class="card"><div class="ico">🛰️</div><h3><small>Portas</small>Superfície de rede</h3>
+      <p>Varredura TCP <em>connect</em> das portas comuns; destaca serviços sensíveis expostos.</p></div>
+    <div class="card"><div class="ico">🏷️</div><h3><small>Serviços</small>Banner &amp; versão</h3>
+      <p>Identifica o serviço em cada porta e a versão divulgada no banner.</p></div>
+    <div class="card"><div class="ico">🧱</div><h3><small>HTTP</small>Hardening</h3>
+      <p>Cabeçalhos de segurança ausentes, divulgação de versão e cookies sem flags.</p></div>
+    <div class="card"><div class="ico">🔒</div><h3><small>TLS</small>Certificado</h3>
+      <p>Protocolo negociado (alerta para TLS &lt; 1.2) e validade do certificado.</p></div>
+    <div class="card"><div class="ico">🗂️</div><h3><small>Descoberta</small>Exposições</h3>
+      <p>GET não destrutivo de <code>.git</code>, <code>.env</code>, backups, painéis e afins.</p></div>
+    <div class="card"><div class="ico">🧭</div><h3><small>Escopo</small>Auditável</h3>
+      <p>Registra o alvo autorizado e toda a trilha de decisão no mesmo relatório.</p></div>
+  </div>
+
+  <div class="terminal" style="margin-bottom:24px">
+    <div class="bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div>
+    <pre><span class="c"># reconhecimento de um alvo autorizado</span>
+<span class="p">$</span> vestigium recon exemplo.com <span class="f">--authorize</span> -o pentest/
+
+<span class="o">  RISCO: Alto (67/100)
+  [CRITICA]  .env exposto (segredos)
+  [ALTA]     repositorio .git exposto
+  [MEDIA]    5 cabecalhos de seguranca ausentes</span></pre>
+  </div>
+
+  <div style="background:#160f1a;border:1px solid #7a3a3a;border-left:4px solid var(--red);
+              border-radius:14px;padding:22px 26px">
+    <h3 style="color:var(--red);margin-bottom:12px;font-size:18px">⚖️ Salvaguardas — não é uma ferramenta de ataque</h3>
+    <ul style="list-style:none;color:var(--muted);font-size:15px;line-height:2">
+      <li>🔒 Exige <code>--authorize</code>: confirmação explícita de que você tem permissão.</li>
+      <li>🎯 Aceita <b>apenas um alvo</b> — faixas CIDR e listas são <b>rejeitadas</b> (sem alvo em massa).</li>
+      <li>🚫 <b>Sem exploração</b>, sem força bruta de credenciais e <b>sem negação de serviço</b>.</li>
+      <li>📋 Uso exclusivo em sistemas autorizados. Testar terceiros sem permissão é ilegal.</li>
+    </ul>
   </div>
 </div></section>
 

@@ -11,6 +11,8 @@ import json
 import time
 from pathlib import Path
 
+from dataclasses import dataclass
+
 from .agent import ScanResult
 from .findings import Severity
 
@@ -19,10 +21,38 @@ EMAIL = "j360074@hotmail.com"
 TOOL = "Vestigium"
 
 
+@dataclass
+class ReportProfile:
+    """Rotulos do relatorio conforme o modo (forense ou pentest)."""
+
+    heading: str = "Relatorio de Analise Forense"
+    subtitle: str = ("Agente autonomo de deteccao &middot; PCAP &middot; LOG "
+                     "&middot; SQLite &middot; Stego &middot; Crypto &middot; Warmup "
+                     "&middot; Phishing &middot; Cadeia &middot; Dropper")
+    evidence_label: str = "Evidencias"
+    custody_title: str = "Cadeia de custodia"
+    footer_role: str = "analise forense"
+    show_custody: bool = True
+
+
+FORENSIC = ReportProfile()
+PENTEST = ReportProfile(
+    heading="Relatorio de Pentest (Reconhecimento)",
+    subtitle=("Reconhecimento autorizado &middot; Portas &middot; Servicos "
+              "&middot; HTTP &middot; TLS &middot; Descoberta &middot; Configuracao"),
+    evidence_label="Alvos",
+    custody_title="Escopo autorizado",
+    footer_role="pentest autorizado",
+    show_custody=False,
+)
+
+
 # ---------------------------------------------------------------- JSON
-def write_json(result: ScanResult, path: Path) -> None:
+def write_json(result: ScanResult, path: Path,
+               profile: ReportProfile = FORENSIC) -> None:
     payload = {
         "tool": TOOL,
+        "report": profile.heading,
         "author": AUTHOR,
         "email": EMAIL,
         "target": result.target,
@@ -43,10 +73,11 @@ def write_json(result: ScanResult, path: Path) -> None:
 
 
 # ---------------------------------------------------------------- Markdown
-def write_markdown(result: ScanResult, path: Path) -> None:
+def write_markdown(result: ScanResult, path: Path,
+                   profile: ReportProfile = FORENSIC) -> None:
     s = result.stats
     L = []
-    L.append(f"# Relatorio de Analise Forense - {TOOL}\n")
+    L.append(f"# {profile.heading} - {TOOL}\n")
     L.append(f"- **Alvo:** `{result.target}`")
     L.append(f"- **Gerado em:** {time.strftime('%Y-%m-%d %H:%M:%S')}")
     L.append(f"- **Autor:** {AUTHOR} <{EMAIL}>")
@@ -84,13 +115,18 @@ def write_markdown(result: ScanResult, path: Path) -> None:
             L.append(f"- **Recomendacao:** {f.recommendation}")
         L.append("")
 
-    L.append("## Cadeia de Custodia\n")
-    L.append("| Arquivo | Tipo | Tamanho | SHA-256 |")
-    L.append("|---|---|---|---|")
-    for e in result.evidences:
-        L.append(f"| `{e.name}` | {e.kind} | {e.size} B | `{e.sha256}` |")
+    L.append(f"## {profile.custody_title}\n")
+    if profile.show_custody and result.evidences:
+        L.append("| Arquivo | Tipo | Tamanho | SHA-256 |")
+        L.append("|---|---|---|---|")
+        for e in result.evidences:
+            L.append(f"| `{e.name}` | {e.kind} | {e.size} B | `{e.sha256}` |")
+    else:
+        L.append(f"Alvo autorizado: `{result.target}`. Somente este alvo foi "
+                 "avaliado, de forma nao destrutiva (sem exploracao, forca bruta "
+                 "ou negacao de servico).")
     L.append("")
-    L.append(f"---\n_{TOOL} - agente autonomo de analise forense. "
+    L.append(f"---\n_{TOOL} - agente autonomo de {profile.footer_role}. "
              f"(c) {AUTHOR}._")
     path.write_text("\n".join(L), encoding="utf-8")
 
@@ -100,7 +136,8 @@ def _esc(s) -> str:
     return html.escape(str(s), quote=True)
 
 
-def write_html(result: ScanResult, path: Path) -> None:
+def write_html(result: ScanResult, path: Path,
+               profile: ReportProfile = FORENSIC) -> None:
     s = result.stats
     sev_order = [Severity.CRITICAL, Severity.HIGH, Severity.MEDIUM,
                  Severity.LOW, Severity.INFO]
@@ -170,6 +207,21 @@ def write_html(result: ScanResult, path: Path) -> None:
     )
 
     trace_html = "".join(f"<div>{_esc(t)}</div>" for t in result.trace)
+
+    if profile.show_custody and result.evidences:
+        custody_section = (
+            f"<h2>{profile.custody_title}</h2>"
+            "<table><thead><tr><th>Arquivo</th><th>Tipo</th><th>Bytes</th>"
+            "<th>Entropia</th><th>SHA-256</th></tr></thead>"
+            f"<tbody>{coc_rows}</tbody></table>"
+        )
+    else:
+        custody_section = (
+            f"<h2>{profile.custody_title}</h2>"
+            f"<p class='src'>Alvo autorizado: <code>{_esc(result.target)}</code>. "
+            "Somente este alvo foi avaliado, de forma nao destrutiva "
+            "(sem exploracao, forca bruta ou negacao de servico).</p>"
+        )
 
     doc = f"""<!doctype html>
 <html lang="pt-br"><head>
@@ -251,13 +303,12 @@ footer {{ margin-top:40px; padding-top:20px; border-top:1px solid var(--line);
 </style></head>
 <body><div class="wrap">
 <header class="hero">
-  <h1>&#128270; {TOOL} &mdash; Relatorio de Analise Forense</h1>
-  <div class="sub">Agente autonomo de deteccao &middot; PCAP &middot; LOG &middot; SQLite
-     &middot; Stego &middot; Crypto &middot; Warmup &middot; Phishing &middot; Cadeia &middot; Dropper</div>
+  <h1>&#128270; {TOOL} &mdash; {profile.heading}</h1>
+  <div class="sub">{profile.subtitle}</div>
   <div class="meta-grid">
     <div><b>Alvo</b>{_esc(result.target)}</div>
     <div><b>Gerado em</b>{time.strftime('%Y-%m-%d %H:%M:%S')}</div>
-    <div><b>Evidencias</b>{s['evidence_count']}</div>
+    <div><b>{profile.evidence_label}</b>{s['evidence_count']}</div>
     <div><b>Achados</b>{s['finding_count']}</div>
     <div><b>Duracao</b>{result.duration}s</div>
     <div><b>Analista</b>{AUTHOR}</div>
@@ -281,15 +332,13 @@ footer {{ margin-top:40px; padding-top:20px; border-top:1px solid var(--line);
 <h2>Detalhamento dos achados</h2>
 {''.join(findings_html) or '<p>Nenhum achado registrado.</p>'}
 
-<h2>Cadeia de custodia</h2>
-<table><thead><tr><th>Arquivo</th><th>Tipo</th><th>Bytes</th><th>Entropia</th>
-<th>SHA-256</th></tr></thead><tbody>{coc_rows}</tbody></table>
+{custody_section}
 
 <h2>Trilha de decisao do agente</h2>
 <details class="trace"><summary>Ver {len(result.trace)} passos</summary>{trace_html}</details>
 
 <footer>
-  Gerado por <b>{TOOL}</b> &mdash; agente autonomo de analise forense.<br>
+  Gerado por <b>{TOOL}</b> &mdash; agente autonomo de {profile.footer_role}.<br>
   &copy; {time.strftime('%Y')} {AUTHOR} &lt;{EMAIL}&gt;. Uso etico e autorizado apenas.
 </footer>
 </div></body></html>"""
